@@ -89,9 +89,11 @@ func createWork(c *gin.Context) {
 		return
 	}
 	work := &models.Work{
-		ID:        utils.GenerateUUID(),
-		Author:    "kalan",
-		CreatedAt: time.Now(),
+		ID:          utils.GenerateUUID(),
+		Name:        input.Name,
+		Description: input.Description,
+		Author:      "kalan",
+		CreatedAt:   time.Now(),
 	}
 
 	ctx := context.Background()
