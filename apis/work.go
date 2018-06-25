@@ -16,14 +16,31 @@ import (
 	"github.com/kjj6198/photos-api/utils"
 )
 
+type getWorksInput struct {
+	Limit  int64  `form:"limit"`
+	WorkID string `form:"work_id"`
+	Cursor string `form:"cursor"`
+}
+
+func (input *getWorksInput) GetLimit() int64 {
+	if input.Limit == 0 {
+		return 100
+	}
+
+	return input.Limit
+}
+
 func getWorks(c *gin.Context) {
 	ctx := context.Background()
 	valueCtx := context.WithValue(ctx, "db", c.MustGet("db"))
+	input := &getWorksInput{}
+	c.ShouldBindQuery(input)
+	fmt.Println(input)
 
 	work := &models.Work{}
 
 	cursor := aws.String("")
-	works, nextCursor, err := work.FindMany(valueCtx, 1, *cursor)
+	works, nextCursor, err := work.FindMany(valueCtx, input.GetLimit(), *cursor)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(400, gin.H{
@@ -189,9 +206,11 @@ func createWorkImages(c *gin.Context) {
 	}
 
 	wg.Wait()
-	fmt.Println(<-receiver)
-
-	fmt.Println(images)
+	close(receiver)
+	for val := range receiver {
+		fmt.Println(val)
+		images = append(images, val)
+	}
 
 	ctx := context.Background()
 	valueCtx := context.WithValue(ctx, "db", db)

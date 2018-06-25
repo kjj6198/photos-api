@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"context"
+	"strings"
 	"time"
 
 	"github.com/satori/go.uuid"
@@ -75,6 +76,10 @@ func (img *Image) FindOne(db *dynamodb.DynamoDB, imageID string) (result *Image,
 	return result, nil
 }
 
+func trim(str string) string {
+	return strings.Replace(str, "\"", "", -1)
+}
+
 // CreateImage creates image by Image struct
 func (img *Image) CreateImage(ctx context.Context) (output *dynamodb.PutItemOutput, err error) {
 	db := ctx.Value("db").(*dynamodb.DynamoDB)
@@ -113,11 +118,11 @@ func (info *ImageInfo) GetImageInfo(data []byte) (result *ImageInfo, err error) 
 	author, _ := x.Get(exif.Artist)
 
 	return &ImageInfo{
-		Make:     make.String(),
-		Model:    model.String(),
-		Exposure: exposure.String(),
-		Aperture: aperture.String(),
-		FocalLen: focal.String(),
-		Author:   author.String(),
+		Make:     trim(make.String()),
+		Model:    trim(model.String()),
+		Exposure: trim(exposure.String()),
+		Aperture: trim(aperture.String()),
+		FocalLen: trim(focal.String()),
+		Author:   trim(author.String()),
 	}, nil
 }
