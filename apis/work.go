@@ -3,9 +3,7 @@ package apis
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -115,18 +113,17 @@ type uploadInfo struct {
 	Filename string
 	Type     string
 	Data     []byte
-	Wg       *sync.WaitGroup
 }
 
-func upload(uploader *services.Uploader, info uploadInfo, c chan models.Image) {
-	defer info.Wg.Done()
+func upload(uploader *services.Uploader, info *uploadInfo, c chan models.Image) {
+
 	fileInfo, err := uploader.Upload(
 		info.WorkID,
 		info.Filename,
 		"image/jpeg",
 		info.Data,
 	)
-
+	fmt.Println("uploading file to s3....")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -136,6 +133,7 @@ func upload(uploader *services.Uploader, info uploadInfo, c chan models.Image) {
 
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	c <- models.Image{
@@ -147,7 +145,7 @@ func upload(uploader *services.Uploader, info uploadInfo, c chan models.Image) {
 }
 
 func createWorkImages(c *gin.Context) {
-	workID := c.Param("id")
+
 	multipart, err := c.MultipartForm()
 	if err != nil {
 		c.JSON(400, gin.H{
@@ -159,30 +157,12 @@ func createWorkImages(c *gin.Context) {
 	files := multipart.File["files"]
 
 	images := []models.Image{}
-	receiver := make(chan models.Image)
-	fmt.Println("test", len(files))
-	var wg sync.WaitGroup
 
 	for _, file := range files {
-		wg.Add(1)
-		f, _ := file.Open()
-		defer f.Close()
-
-		data, err := ioutil.ReadAll(f)
-		if err != nil {
-			fmt.Println("error during uploading file, skip.")
-		}
-
-		go upload(c.MustGet("uploader").(*services.Uploader), uploadInfo{
-			WorkID:   workID,
-			Filename: file.Filename,
-			Type:     "image/jpeg",
-			Data:     data,
-			Wg:       &wg,
-		}, receiver)
+		fmt.Println(file)
+		fmt.Println("hello world")
 	}
 
-	wg.Wait()
 	fmt.Println("lock end")
 	c.JSON(200, images)
 }
