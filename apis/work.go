@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/gin-gonic/gin"
 	"github.com/kjj6198/photos-api/models"
@@ -18,7 +17,6 @@ import (
 
 type getWorksInput struct {
 	Limit  int64  `form:"limit"`
-	WorkID string `form:"work_id"`
 	Cursor string `form:"cursor"`
 }
 
@@ -39,8 +37,7 @@ func getWorks(c *gin.Context) {
 
 	work := &models.Work{}
 
-	cursor := aws.String("")
-	works, nextCursor, err := work.FindMany(valueCtx, input.GetLimit(), *cursor)
+	works, nextCursor, err := work.FindMany(valueCtx, input.GetLimit(), input.Cursor)
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(400, gin.H{
@@ -56,22 +53,27 @@ func getWorks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"works": works,
-	})
-
+	c.JSON(200, works)
 }
 
 func getWork(c *gin.Context) {
 	id := c.Param("id")
+	db := c.MustGet("db").(*dynamodb.DynamoDB)
 	if id != "" {
 		work := &models.Work{
 			ID: id,
 		}
 
 		ctx := context.Background()
-		valueCtx := context.WithValue(ctx, "db", c.MustGet("db"))
+		valueCtx := context.WithValue(ctx, "db", db)
 		work, err := work.FindOne(valueCtx)
+
+		img := &models.Image{
+			WorkID: id,
+		}
+
+		images, _, _ := img.GetImages(db, "")
+		fmt.Println(images)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -137,7 +139,7 @@ type uploadInfo struct {
 }
 
 func upload(uploader *services.Uploader, info *uploadInfo, c chan models.Image) {
-
+	defer info.Wg.Done()
 	fileInfo, err := uploader.Upload(
 		info.WorkID,
 		info.Filename,
@@ -145,7 +147,6 @@ func upload(uploader *services.Uploader, info *uploadInfo, c chan models.Image) 
 		info.Data,
 	)
 
-	fmt.Println("uploading file to s3....")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -155,10 +156,7 @@ func upload(uploader *services.Uploader, info *uploadInfo, c chan models.Image) 
 
 	if err != nil {
 		fmt.Println(err)
-		return
 	}
-
-	defer info.Wg.Done()
 
 	c <- models.Image{
 		WorkID: info.WorkID,
@@ -208,7 +206,6 @@ func createWorkImages(c *gin.Context) {
 	wg.Wait()
 	close(receiver)
 	for val := range receiver {
-		fmt.Println(val)
 		images = append(images, val)
 	}
 
@@ -223,12 +220,25 @@ func createWorkImages(c *gin.Context) {
 }
 
 func getWorkImages(c *gin.Context) {
+	id := c.Param("id")
+	db := c.MustGet("db").(*dynamodb.DynamoDB)
+	img := &models.Image{
+		WorkID: id,
+	}
 
+	images, _, err := img.GetImages(db, "")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	c.JSON(200, images)
 }
 
 func RegisterWorkHandler(router *gin.RouterGroup) {
 	router.GET("/:id", getWork)
+	router.GET("/:id/images", getWorkImages)
 	router.POST("/:id/images", createWorkImages)
 	router.GET("/", getWorks)
+
 	router.POST("/", createWork)
 }

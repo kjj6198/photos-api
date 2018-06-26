@@ -9,10 +9,13 @@ import (
 	"github.com/kjj6198/photos-api/db"
 	"github.com/kjj6198/photos-api/middlewares"
 	"github.com/kjj6198/photos-api/services"
+	"gopkg.in/gographics/imagick.v2/imagick"
 )
 
 func main() {
 	config.Load()
+	imagick.Initialize()
+	defer imagick.Terminate()
 
 	router := gin.Default()
 	db := db.NewDB()

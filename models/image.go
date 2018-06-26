@@ -34,28 +34,60 @@ type Image struct {
 	CreatedAt time.Time  `json:"created_at"`
 	ImageURL  *ImageURL  `json:"image_url"`
 	ImageInfo *ImageInfo `json:"image_info"`
-	WorkID    string     `json:"work_id"`
+	WorkID    string     `json:"-"`
 }
 
-func (img *Image) GetImages(db *dynamodb.DynamoDB) (images []*Image, hasNext bool, err error) {
+func (img *Image) GetImagesCount(db *dynamodb.DynamoDB) (int64, error) {
 	filter := expression.Name("work_id").Equal(expression.Value(img.WorkID))
 	exp, _ := expression.NewBuilder().WithFilter(filter).Build()
 	input := &dynamodb.ScanInput{
-		TableName: aws.String("images"),
-		Limit:     aws.Int64(100),
+		TableName:                 aws.String("images"),
 		ExpressionAttributeNames:  exp.Names(),
 		ExpressionAttributeValues: exp.Values(),
 		FilterExpression:          exp.Filter(),
 	}
 
 	output, err := db.Scan(input)
-
 	if err != nil {
-		return nil, false, err
+		return 0, err
+	}
+
+	return *output.ScannedCount, nil
+}
+
+func (img *Image) GetImages(db *dynamodb.DynamoDB, cursor string) (images []*Image, nextCursor string, err error) {
+	filter := expression.Name("work_id").Equal(expression.Value(img.WorkID))
+	exp, _ := expression.NewBuilder().WithFilter(filter).Build()
+	var exclusiveKey map[string]*dynamodb.AttributeValue
+
+	if cursor != "" {
+		exclusiveKey = map[string]*dynamodb.AttributeValue{
+			"id": &dynamodb.AttributeValue{
+				S: aws.String(cursor),
+			},
+		}
+	}
+
+	input := &dynamodb.ScanInput{
+		TableName: aws.String("images"),
+		Limit:     aws.Int64(100), // TODO: cursor base
+		ExpressionAttributeNames:  exp.Names(),
+		ExpressionAttributeValues: exp.Values(),
+		FilterExpression:          exp.Filter(),
+		ExclusiveStartKey:         exclusiveKey,
+	}
+
+	output, err := db.Scan(input)
+	if err != nil {
+		return nil, "", err
 	}
 
 	dynamodbattribute.UnmarshalListOfMaps(output.Items, &images)
-	return images, output.LastEvaluatedKey == nil, nil
+	if output.LastEvaluatedKey != nil {
+		return images, *output.LastEvaluatedKey["id"].S, nil
+	}
+
+	return images, "", nil
 }
 
 func (img *Image) FindOne(db *dynamodb.DynamoDB, imageID string) (result *Image, err error) {

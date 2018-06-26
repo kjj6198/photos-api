@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -10,10 +11,14 @@ import (
 
 // Base64ToDynamoDBAttributeValue converts base64 to real string
 func Base64ToDynamoDBAttributeValue(str string) (map[string]*dynamodb.AttributeValue, error) {
-	dataBytes, _ := base64.StdEncoding.DecodeString(str)
-	data := make(map[string]interface{})
-	json.Unmarshal(dataBytes, data)
+	dataBytes, err := base64.StdEncoding.DecodeString(str)
+	if err != nil {
+		fmt.Println(err)
+	}
 
+	data := make(map[string]interface{})
+
+	json.Unmarshal(dataBytes, &data)
 	return dynamodbattribute.MarshalMap(data)
 }
 

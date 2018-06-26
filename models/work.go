@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"github.com/kjj6198/photos-api/utils"
 )
 
 // Work represents for "作品集"
@@ -43,14 +42,6 @@ func (work *Work) FindOne(ctx context.Context) (result *Work, err error) {
 	}
 	result = &Work{}
 	dynamodbattribute.UnmarshalMap(res.Item, result)
-	image := &Image{
-		WorkID: result.ID,
-	}
-	images, _, err := image.GetImages(db)
-	if err != nil {
-		return nil, err
-	}
-	result.Images = images
 
 	return result, nil
 }
@@ -64,17 +55,20 @@ func (work *Work) FindMany(
 	db := ctx.Value("db").(*dynamodb.DynamoDB)
 
 	limit = int64(math.Max(1, math.Min(float64(limit), 100.0)))
-	av, err := utils.Base64ToDynamoDBAttributeValue(cursor)
+	var exclusiveKey map[string]*dynamodb.AttributeValue
 
-	if err != nil || len(av) == 0 {
-		fmt.Println("can not convert cursor, skip it.")
-		av = nil
+	if cursor != "" {
+		exclusiveKey = map[string]*dynamodb.AttributeValue{
+			"id": &dynamodb.AttributeValue{
+				S: aws.String(cursor),
+			},
+		}
 	}
 
 	input := &dynamodb.ScanInput{
 		TableName:         aws.String("works"),
 		Limit:             aws.Int64(limit),
-		ExclusiveStartKey: av,
+		ExclusiveStartKey: exclusiveKey,
 	}
 
 	output, err := db.Scan(input)
@@ -85,8 +79,12 @@ func (work *Work) FindMany(
 	}
 
 	dynamodbattribute.UnmarshalListOfMaps(output.Items, &result)
-	nextCursor = utils.DynamoDBAttributeValueToBase64(output.LastEvaluatedKey)
-	return result, nextCursor, nil
+
+	if output.LastEvaluatedKey != nil {
+		return result, *output.LastEvaluatedKey["id"].S, nil
+	}
+
+	return result, "", nil
 }
 
 // Create creates a work in dynamoDB
