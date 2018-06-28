@@ -37,6 +37,10 @@ func (work *Work) FindOne(ctx context.Context) (result *Work, err error) {
 		},
 	})
 
+	if res.Item == nil {
+		return nil, fmt.Errorf("can not find Work.")
+	}
+
 	if err != nil {
 		return nil, err
 	}

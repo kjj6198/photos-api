@@ -76,8 +76,8 @@ func getWork(c *gin.Context) {
 		fmt.Println(images)
 
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": err.Error(),
+			c.JSON(http.StatusNotFound, gin.H{
+				"message": "can not find work.",
 			})
 
 			return

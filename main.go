@@ -27,10 +27,14 @@ func main() {
 
 	router.Use(middlewares.Auth())
 
-	router.StaticFile("/", "./index.html")
+	if os.Getenv("env") == "development" {
+		router.StaticFile("/", "./index.html")
+	}
 
-	v1 := router.Group("api/v1/works")
-	apis.RegisterWorkHandler(v1)
+	v1 := router.Group("api/v1")
+
+	apis.RegisterWorkHandler(v1.Group("/works"))
+	apis.RegisterAuthHandler(v1.Group("/auth"))
 
 	router.Run()
 }
