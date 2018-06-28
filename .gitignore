@@ -2,3 +2,4 @@ env.yml
 config/env.yml
 vendor/*
 !vendor/vendor.json
+.DS_Store
