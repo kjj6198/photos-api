@@ -32,6 +32,13 @@ func main() {
 	}
 
 	v1 := router.Group("api/v1")
+	router.NoRoute(func(c *gin.Context) {
+		if c.GetHeader("Content-Type") == "application/json" {
+			c.AbortWithStatusJSON(404, nil)
+			return
+		}
+		c.Next()
+	})
 
 	apis.RegisterWorkHandler(v1.Group("/works"))
 	apis.RegisterAuthHandler(v1.Group("/auth"))
